@@ -1,0 +1,81 @@
+cubes:
+  - name: truck_telemetry
+    title: Cymbal Truck Telemetry
+    description: Vehicle IoT telemetry events from Cymbal Trucks fleets in BigQuery.
+    sql_table: "`cymbal-trucks.CymTruckTelemetry.JSON_Data_Parsed`"
+
+    dimensions:
+      - name: telemetry_id
+        sql: "CONCAT(CAST({CUBE}.VehicleId AS STRING), '-', CAST(UNIX_MICROS({CUBE}.publish_time) AS STRING), '-', IFNULL(CAST({CUBE}.ReportId AS STRING), '0'))"
+        type: string
+        primary_key: true
+        public: false
+
+      - name: publish_time
+        sql: "{CUBE}.publish_time"
+        type: time
+        description: Timestamp when the vehicle telemetry event was published.
+
+      - name: fleet_id
+        sql: "{CUBE}.FleetId"
+        type: number
+
+      - name: fleet_name
+        sql: "{CUBE}.FleetName"
+        type: string
+        description: Name of the Cymbal Trucks fleet.
+
+      - name: vehicle_id
+        sql: "{CUBE}.VehicleId"
+        type: number
+
+      - name: vehicle_name
+        sql: "{CUBE}.VehicleName"
+        type: string
+        description: Display name or registration identifier of the truck.
+
+      - name: vehicle_external_ref
+        sql: "{CUBE}.VehicleExternalRef"
+        type: string
+
+      - name: driver_id
+        sql: "{CUBE}.DriverId"
+        type: number
+
+      - name: report_type
+        sql: "{CUBE}.Report"
+        type: string
+        description: Telemetry event or report classification.
+
+      - name: device_id
+        sql: "{CUBE}.DeviceId"
+        type: string
+
+      - name: device_serial_number
+        sql: "{CUBE}.DeviceSerialNumber"
+        type: string
+
+    measures:
+      - name: event_count
+        type: count
+        description: Total number of telemetry events recorded.
+
+      - name: distinct_vehicles
+        sql: "{CUBE}.VehicleId"
+        type: count_distinct
+        description: Number of unique vehicles reporting telemetry.
+
+      - name: distinct_drivers
+        sql: "{CUBE}.DriverId"
+        type: count_distinct
+        description: Number of unique drivers active across telemetry events.
+
+      - name: max_odometer
+        sql: "{CUBE}.Odometer"
+        type: max
+        description: Highest recorded odometer reading.
+
+      - name: max_total_fuel
+        sql: "{CUBE}.TotalFuel"
+        type: max
+        description: Highest cumulative fuel counter reported.

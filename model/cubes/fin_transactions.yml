@@ -1,0 +1,54 @@
+cubes:
+  - name: fin_transactions
+    title: Cymbal Financial Transactions
+    description: General ledger financial transactions for Cymbal Trucks across regions.
+    sql_table: "`cymbal-trucks.cymbal_financial_reporting.fin_transactions`"
+
+    joins:
+      - name: fin_accounts
+        relationship: many_to_one
+        sql: "{CUBE}.account_code = {fin_accounts.account_code}"
+
+    dimensions:
+      - name: transaction_id
+        sql: "{CUBE}.transaction_id"
+        type: string
+        primary_key: true
+        public: true
+
+      - name: transaction_date
+        sql: "CAST({CUBE}.transaction_date AS TIMESTAMP)"
+        type: time
+        description: Date of the financial ledger transaction.
+
+      - name: account_code
+        sql: "{CUBE}.account_code"
+        type: number
+
+      - name: base_currency_type
+        sql: "{CUBE}.base_currency_type"
+        type: string
+
+      - name: description
+        sql: "{CUBE}.description"
+        type: string
+
+      - name: region_id
+        sql: "{CUBE}.region_id"
+        type: string
+        description: Geographic or business region identifier.
+
+    measures:
+      - name: transaction_count
+        type: count
+        description: Count of financial transactions.
+
+      - name: total_amount
+        sql: "{CUBE}.amount"
+        type: sum
+        description: Sum of transaction amounts in base currency.
+
+      - name: avg_amount
+        sql: "{CUBE}.amount"
+        type: avg
+        description: Average transaction amount.

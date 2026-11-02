@@ -1,0 +1,19 @@
+views:
+  - name: fleet_operations
+    description: Curated Cymbal Trucks fleet & vehicle IoT telemetry metrics and dimensions.
+    cubes:
+      - join_path: truck_telemetry
+        includes:
+          - publish_time
+          - fleet_id
+          - fleet_name
+          - vehicle_id
+          - vehicle_name
+          - driver_id
+          - report_type
+          - device_id
+          - event_count
+          - distinct_vehicles
+          - distinct_drivers
+          - max_odometer
+          - max_total_fuel

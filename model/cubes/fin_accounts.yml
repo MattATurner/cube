@@ -1,0 +1,30 @@
+cubes:
+  - name: fin_accounts
+    title: Cymbal Financial Accounts
+    description: Chart of accounts master table for Cymbal Trucks financial reporting.
+    sql_table: "`cymbal-trucks.cymbal_financial_reporting.fin_accounts`"
+
+    dimensions:
+      - name: account_code
+        sql: "{CUBE}.account_code"
+        type: number
+        primary_key: true
+        public: true
+
+      - name: account_name
+        sql: "{CUBE}.account_name"
+        type: string
+        description: Financial account name.
+
+      - name: node_id
+        sql: "{CUBE}.node_id"
+        type: string
+        description: Financial hierarchy node identifier.
+
+      - name: is_active
+        sql: "{CUBE}.is_active"
+        type: boolean
+
+    measures:
+      - name: count
+        type: count

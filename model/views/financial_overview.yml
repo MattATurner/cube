@@ -1,0 +1,21 @@
+views:
+  - name: financial_overview
+    description: Curated Cymbal Trucks financial ledger metrics joined with the chart of accounts.
+    cubes:
+      - join_path: fin_transactions
+        includes:
+          - transaction_id
+          - transaction_date
+          - region_id
+          - base_currency_type
+          - description
+          - transaction_count
+          - total_amount
+          - avg_amount
+
+      - join_path: fin_transactions.fin_accounts
+        includes:
+          - account_code
+          - account_name
+          - node_id
+          - is_active
