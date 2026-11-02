@@ -1,0 +1,43 @@
+cubes:
+  - name: jpg_stores
+    title: JPG Retail Stores
+    description: Store master across Prouds Jewellers, Angus & Coote, Farmers, and Pascoes in Australia & New Zealand.
+    sql_table: "`cymbal-trucks.jpg_retail_demo.stores`"
+
+    dimensions:
+      - name: store_id
+        sql: "{CUBE}.store_id"
+        type: string
+        primary_key: true
+        public: true
+
+      - name: store_name
+        sql: "{CUBE}.store_name"
+        type: string
+        description: Store location name.
+
+      - name: banner
+        sql: "{CUBE}.banner"
+        type: string
+        description: Retail brand banner (Prouds Jewellers, Angus & Coote, Farmers, Pascoes).
+
+      - name: country
+        sql: "{CUBE}.country"
+        type: string
+        description: Country (Australia or New Zealand).
+
+      - name: region
+        sql: "{CUBE}.region"
+        type: string
+
+      - name: city
+        sql: "{CUBE}.city"
+        type: string
+
+      - name: target_weeks_cover
+        sql: "{CUBE}.target_weeks_cover"
+        type: number
+
+    measures:
+      - name: store_count
+        type: count

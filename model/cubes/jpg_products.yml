@@ -1,0 +1,37 @@
+cubes:
+  - name: jpg_products
+    title: JPG Merchandise SKUs
+    description: Merchandise catalog across Fine Diamond Jewellery, Swiss & Luxury Watches, 9ct & 18ct Gold Chains, and Beauty & Home Fragrance.
+    sql_table: "`cymbal-trucks.jpg_retail_demo.products`"
+
+    dimensions:
+      - name: sku_id
+        sql: "{CUBE}.sku_id"
+        type: string
+        primary_key: true
+        public: true
+
+      - name: product_name
+        sql: "{CUBE}.product_name"
+        type: string
+
+      - name: category
+        sql: "{CUBE}.category"
+        type: string
+        description: Merchandise category.
+
+      - name: unit_cost_aud
+        sql: "{CUBE}.unit_cost_aud"
+        type: number
+        format: currency
+        currency: AUD
+
+      - name: retail_price_aud
+        sql: "{CUBE}.retail_price_aud"
+        type: number
+        format: currency
+        currency: AUD
+
+    measures:
+      - name: sku_count
+        type: count

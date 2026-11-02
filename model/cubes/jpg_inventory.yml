@@ -1,0 +1,242 @@
+cubes:
+  - name: jpg_inventory
+    title: JPG Daily Inventory & Sales Ledger
+    description: >
+      Daily Store x SKU inventory snapshots joined 1:1 with daily sales.
+      Demonstrates Cube Tesseract multi-stage semi-additive measures (Opening Balance,
+      Closing Balance, Average Daily Balance, and Weeks of Cover) vs. additive sales flows.
+    sql: |
+      SELECT
+        inv.snapshot_id,
+        inv.snapshot_date,
+        inv.store_id,
+        inv.sku_id,
+        inv.opening_units,
+        inv.receipt_units,
+        inv.sold_units_day,
+        inv.on_hand_units,
+        inv.in_transit_units,
+        inv.on_hand_cost_aud,
+        inv.on_hand_retail_aud,
+        COALESCE(sal.net_sales_aud, 0) AS net_sales_aud,
+        COALESCE(sal.cogs_aud, 0) AS cogs_aud,
+        COALESCE(sal.gross_margin_aud, 0) AS gross_margin_aud
+      FROM `cymbal-trucks.jpg_retail_demo.daily_inventory_snapshots` AS inv
+      LEFT JOIN `cymbal-trucks.jpg_retail_demo.daily_sales` AS sal
+        ON inv.snapshot_date = sal.sale_date
+       AND inv.store_id = sal.store_id
+       AND inv.sku_id = sal.sku_id
+
+    joins:
+      - name: jpg_stores
+        relationship: many_to_one
+        sql: "{CUBE}.store_id = {jpg_stores.store_id}"
+
+      - name: jpg_products
+        relationship: many_to_one
+        sql: "{CUBE}.sku_id = {jpg_products.sku_id}"
+
+    dimensions:
+      - name: snapshot_id
+        sql: "{CUBE}.snapshot_id"
+        type: string
+        primary_key: true
+        public: false
+
+      - name: snapshot_date
+        sql: "CAST({CUBE}.snapshot_date AS TIMESTAMP)"
+        type: time
+        description: Calendar date of the inventory snapshot and daily trading activity.
+
+      - name: snapshot_day
+        sql: "CAST({CUBE}.snapshot_date AS STRING)"
+        type: string
+        public: false
+        description: Atomic YYYY-MM-DD grain key used by semi-additive multi-stage measures.
+
+      - name: store_id
+        sql: "{CUBE}.store_id"
+        type: string
+
+      - name: sku_id
+        sql: "{CUBE}.sku_id"
+        type: string
+
+    measures:
+      # --- Internal Stage-1 Daily Totals (SUM across Stores & SKUs within a single Day) ---
+      - name: stage1_opening_units
+        sql: "{CUBE}.opening_units"
+        type: sum
+        public: false
+
+      - name: stage1_closing_units
+        sql: "{CUBE}.on_hand_units"
+        type: sum
+        public: false
+
+      - name: stage1_closing_cost_aud
+        sql: "{CUBE}.on_hand_cost_aud"
+        type: sum
+        public: false
+
+      - name: stage1_closing_retail_aud
+        sql: "{CUBE}.on_hand_retail_aud"
+        type: sum
+        public: false
+
+      - name: stage1_day_epoch
+        sql: "UNIX_DATE({CUBE}.snapshot_date)"
+        type: max
+        public: false
+
+      - name: distinct_snapshot_days
+        sql: "{CUBE}.snapshot_date"
+        type: count_distinct
+        description: Number of distinct daily snapshots in the queried period.
+
+      # --- 1. SEMI-ADDITIVE MEASURES (SUM across Stores/SKUs, Non-Additive across Time) ---
+      - name: opening_stock_units
+        title: "Opening Stock Units (Semi-Additive)"
+        description: >
+          Semi-additive opening balance: SUM across stores, banners, and SKUs on the
+          FIRST snapshot date of the queried period.
+        multi_stage: true
+        type: number_agg
+        sql: "ARRAY_AGG({stage1_opening_units} ORDER BY {stage1_day_epoch} ASC LIMIT 1)[SAFE_OFFSET(0)]"
+        grain:
+          include:
+            - snapshot_day
+
+      - name: closing_stock_units
+        title: "Closing Stock Units (Semi-Additive)"
+        description: >
+          Semi-additive ending balance: SUM across stores, banners, and SKUs on the
+          LAST snapshot date of the queried period (never summed across days).
+        multi_stage: true
+        type: number_agg
+        sql: "ARRAY_AGG({stage1_closing_units} ORDER BY {stage1_day_epoch} DESC LIMIT 1)[SAFE_OFFSET(0)]"
+        grain:
+          include:
+            - snapshot_day
+
+      - name: closing_stock_cost_aud
+        title: "Closing Stock Cost AUD (Semi-Additive)"
+        description: >
+          Semi-additive closing inventory value at cost (AUD) on the LAST snapshot date of the period.
+        multi_stage: true
+        type: number_agg
+        sql: "ARRAY_AGG({stage1_closing_cost_aud} ORDER BY {stage1_day_epoch} DESC LIMIT 1)[SAFE_OFFSET(0)]"
+        format: currency
+        currency: AUD
+        grain:
+          include:
+            - snapshot_day
+
+      - name: closing_stock_retail_aud
+        title: "Closing Stock Retail AUD (Semi-Additive)"
+        description: >
+          Semi-additive closing inventory retail value (AUD) on the LAST snapshot date of the period.
+        multi_stage: true
+        type: number_agg
+        sql: "ARRAY_AGG({stage1_closing_retail_aud} ORDER BY {stage1_day_epoch} DESC LIMIT 1)[SAFE_OFFSET(0)]"
+        format: currency
+        currency: AUD
+        grain:
+          include:
+            - snapshot_day
+
+      - name: avg_daily_stock_units
+        title: "Avg Daily Stock Units (Semi-Additive)"
+        description: >
+          Semi-additive average balance: SUM across stores and SKUs per day, then AVG across days in the period.
+        multi_stage: true
+        type: avg
+        sql: "{stage1_closing_units}"
+        grain:
+          include:
+            - snapshot_day
+
+      - name: avg_daily_stock_cost_aud
+        title: "Avg Daily Stock Cost AUD (Semi-Additive)"
+        description: >
+          Semi-additive average inventory cost (AUD): SUM across stores and SKUs per day, then AVG across days.
+        multi_stage: true
+        type: avg
+        sql: "{stage1_closing_cost_aud}"
+        format: currency
+        currency: AUD
+        grain:
+          include:
+            - snapshot_day
+
+      # --- 2. ADDITIVE FLOW MEASURES (SUM across both Stores/SKUs AND Time) ---
+      - name: receipt_units
+        title: "Units Received (Additive)"
+        description: Fully additive count of units received from distribution centers across the period.
+        sql: "{CUBE}.receipt_units"
+        type: sum
+
+      - name: units_sold
+        title: "Units Sold (Additive)"
+        description: Fully additive count of units sold across stores and days in the period.
+        sql: "{CUBE}.sold_units_day"
+        type: sum
+
+      - name: net_sales_aud
+        title: "Net Sales AUD (Additive)"
+        description: Fully additive net retail sales revenue (AUD) across the period.
+        sql: "{CUBE}.net_sales_aud"
+        type: sum
+        format: currency
+        currency: AUD
+
+      - name: cogs_aud
+        title: "COGS AUD (Additive)"
+        sql: "{CUBE}.cogs_aud"
+        type: sum
+        format: currency
+        currency: AUD
+
+      - name: gross_margin_aud
+        title: "Gross Margin AUD (Additive)"
+        sql: "{CUBE}.gross_margin_aud"
+        type: sum
+        format: currency
+        currency: AUD
+
+      - name: gross_margin_pct
+        title: "Gross Margin %"
+        sql: "100.0 * {gross_margin_aud} / NULLIF({net_sales_aud}, 0)"
+        type: number
+
+      # --- 3. MULTI-STAGE MERCHANDISING KPIs ---
+      - name: net_stock_change_units
+        title: "Net Period Stock Change (Closing - Opening)"
+        description: Exact period stock delta reconciling to Units Received minus Units Sold.
+        multi_stage: true
+        type: number
+        sql: "{closing_stock_units} - {opening_stock_units}"
+
+      - name: weeks_of_cover
+        title: "Weeks of Supply (Cover)"
+        description: >
+          Closing Stock Units divided by normalized weekly unit sales velocity over the period (target: 8.0 weeks).
+        multi_stage: true
+        type: number
+        sql: "{closing_stock_units} / NULLIF(({units_sold} / NULLIF({distinct_snapshot_days} / 7.0, 0)), 0)"
+
+      # --- 4. ANTI-PATTERN COMPARISON MEASURE (Shows what breaks without Semi-Additive logic!) ---
+      - name: naive_sum_stock_units
+        title: "Naive SUM Stock Units (Broken Anti-Pattern)"
+        description: >
+          Demonstrates the classic spreadsheet/SQL bug: summing daily stock snapshots across days
+          inflates inventory by 30x per month and 91x per quarter.
+        sql: "{CUBE}.on_hand_units"
+        type: sum
+
+      - name: naive_sum_stock_cost_aud
+        title: "Naive SUM Stock Cost AUD (Broken Anti-Pattern)"
+        sql: "{CUBE}.on_hand_cost_aud"
+        type: sum
+        format: currency
+        currency: AUD

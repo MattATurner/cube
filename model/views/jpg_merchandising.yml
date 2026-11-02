@@ -1,0 +1,46 @@
+views:
+  - name: jpg_merchandising
+    title: JPG Merchandising & Semi-Additive Inventory
+    description: >
+      Unified semantic view for JPG Merchandising, Finance, Excel PivotTables, and Web Cockpits.
+      Combines semi-additive stock balances (Opening, Closing, Average Daily, Weeks of Cover)
+      with additive retail sales and receipts across Banners, Stores, and Merchandise Categories.
+    cubes:
+      - join_path: jpg_inventory
+        includes:
+          - snapshot_date
+          - opening_stock_units
+          - receipt_units
+          - units_sold
+          - closing_stock_units
+          - net_stock_change_units
+          - avg_daily_stock_units
+          - closing_stock_cost_aud
+          - closing_stock_retail_aud
+          - avg_daily_stock_cost_aud
+          - net_sales_aud
+          - cogs_aud
+          - gross_margin_aud
+          - gross_margin_pct
+          - weeks_of_cover
+          - distinct_snapshot_days
+          - naive_sum_stock_units
+          - naive_sum_stock_cost_aud
+
+      - join_path: jpg_inventory.jpg_stores
+        includes:
+          - store_id
+          - store_name
+          - banner
+          - country
+          - region
+          - city
+          - target_weeks_cover
+
+      - join_path: jpg_inventory.jpg_products
+        includes:
+          - sku_id
+          - product_name
+          - category
+          - unit_cost_aud
+          - retail_price_aud
